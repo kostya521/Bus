@@ -1,5 +1,8 @@
 package com.goeuro.challenges.busroutesservice.exceptions;
 
+/**
+ *
+ */
 public class DataFileException extends RuntimeException {
 
   public DataFileException() {

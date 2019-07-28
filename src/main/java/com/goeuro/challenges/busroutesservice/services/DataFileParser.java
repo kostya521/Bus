@@ -1,10 +1,10 @@
 package com.goeuro.challenges.busroutesservice.services;
 
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public interface DataFileParser {
 
-  Map<Integer, Set<Integer>> processDataFile(String path);
+  Map<Integer, List<Integer>> processDataFile(String path);
 
 }

@@ -9,11 +9,9 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -21,38 +19,42 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+/**
+ * This class parses input data file and stores it to Map where key is a route id and value is a
+ * List of station ids in the same order as in a file.
+ */
 @Component
 public class DataFileParserImpl implements DataFileParser {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataFileParserImpl.class);
 
+  private static final int MIN_NUM_OF_VALUES_PER_LINE = 3;
+
   private static final String VALUE_SEPARATOR = "\\s";
 
-
+  /**
+   * Reads file and store parsed data to Map.
+   *
+   * @param path a string containing data file path
+   * @return a Map where key is a routeId and value is a List of stationIds
+   * @throws DataFileException if data file is invalid
+   */
   @Override
-  public Map<Integer, Set<Integer>> processDataFile(String path) {
+  public Map<Integer, List<Integer>> processDataFile(String path) {
     LOG.debug("Started processing data file: {}", path);
-    final HashMap<Integer, Set<Integer>> stationToRouteMap = new HashMap<>();
     final List<List<Integer>> parsedLines = openAndParseFile(path);
 
     validateParsedData(parsedLines);
 
+    final Map<Integer, List<Integer>> routesMap = new HashMap<>();
+
     final Iterator<List<Integer>> linesIterator = parsedLines.listIterator(1);
     while (linesIterator.hasNext()) {
-      final List<Integer> parsedLine = linesIterator.next();
-      mapStationToRoute(stationToRouteMap, parsedLine);
+      storeStationsPerRoute(routesMap, linesIterator.next());
     }
-
-    final Map<Integer, Set<Integer>> result = makeDataUnmodifiable(stationToRouteMap);
+    final Map<Integer, List<Integer>> result = Collections.unmodifiableMap(routesMap);
     LOG.debug("Finished processing data file");
     return result;
-  }
-
-  private Map<Integer, Set<Integer>> makeDataUnmodifiable(HashMap<Integer, Set<Integer>> map) {
-    map.keySet().forEach(key ->
-        map.put(key, Collections.unmodifiableSet(map.get(key)))
-    );
-    return Collections.unmodifiableMap(map);
   }
 
   private List<List<Integer>> openAndParseFile(String path) {
@@ -80,20 +82,19 @@ public class DataFileParserImpl implements DataFileParser {
     }
   }
 
-  private void mapStationToRoute(HashMap<Integer, Set<Integer>> stationToRouteMap,
-      List<Integer> values) {
-    final Iterator<Integer> iterator = values.iterator();
-    final Integer routeId = iterator.next();
+  private void storeStationsPerRoute(Map<Integer, List<Integer>> routes, List<Integer> values) {
+    validateLineData(values);
+    routes.put(values.get(0), Collections.unmodifiableList(values.subList(1, values.size())));
+  }
 
-    while (iterator.hasNext()) {
-      final Integer stationId = iterator.next();
-      if (stationToRouteMap.containsKey(stationId)) {
-        stationToRouteMap.get(stationId).add(routeId);
-      } else {
-        final Set<Integer> routes = new HashSet<>();
-        routes.add(routeId);
-        stationToRouteMap.put(stationId, routes);
-      }
+  private void validateLineData(List<Integer> values) {
+    if (CollectionUtils.isEmpty(values) ||
+        values.size() < MIN_NUM_OF_VALUES_PER_LINE) {
+      final String message = String.format("Invalid data file: line contains less than %s value",
+          MIN_NUM_OF_VALUES_PER_LINE);
+
+      LOG.error(message);
+      throw new DataFileException(message);
     }
   }
 
